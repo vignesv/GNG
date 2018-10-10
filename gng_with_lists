@@ -1,0 +1,213 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Mon Sep 24 22:37:25 2018
+
+@author: oylem
+"""
+
+import random as random
+from scipy.spatial import distance
+import numpy as numpy
+import matplotlib.pyplot as plt
+
+NodeId=0
+LowerLimit=0
+UpperLimit=100
+InputSignal=[]
+InputCount=0
+alpha=0.5
+d=0.5
+nodes=[]
+initializedNodes=[]
+bmu=[[],0,0,0,[]]
+sbmu=[[],0,0,0,[]]
+amax=10
+Eb=0.5
+En=0.25
+
+def GenerateInput(n):
+    global InputSignal
+    for i in range(0,n):
+        InputSignal.append([random.randint(LowerLimit,UpperLimit),random.randint(LowerLimit,UpperLimit)])
+    
+def InitializeNode(InputSignal):
+    global nodes
+    global NodeId
+    global LowerLimit
+    global UpperLimit
+    global initializedNodes
+        
+    for i in range(0,2):
+        p=[random.randint(LowerLimit,UpperLimit),random.randint(LowerLimit,UpperLimit)]
+        dist=distance.euclidean(p, InputSignal)
+        nodes.append([p,NodeId,dist,0,[]])
+        print "initialized nodes", [p,NodeId,dist,0,[]]
+        NodeId +=1
+    
+
+#class Nodes:
+#    def __init__(self):
+#        global Position
+#        self.Position=Position
+#        global Distance
+#        self.Distance=Distance
+#        global NodeId
+#        self.NodeId = NodeId+1
+#        self.Error=0
+#        self.Neighbors=[]
+    
+def GetBMU():
+    global bmu
+    global nodes
+    bmu=sorted(nodes, key=lambda tup: tup[2])[0]
+    
+def GetSBMU():
+    global sbmu
+    global nodes
+    sbmu=sorted(nodes, key=lambda tup: tup[2])[1]
+    
+def MoveBMU(bmu,InputSignal):
+    global Eb
+    global nodes
+    nodes[bmu[1]][0][0]=nodes[bmu[1]][0][0]+ Eb*(InputSignal[0]-nodes[bmu[1]][0][0])
+    nodes[bmu[1]][0][1]=nodes[bmu[1]][0][1]+ Eb*(InputSignal[1]-nodes[bmu[1]][0][1])
+    print "moved BMU",nodes[bmu[1]]    
+        
+def IncrementAge(bmu):
+    global nodes
+    temp = nodes[bmu[1]][4]
+    if not temp == False:
+        for i in range(0,len(temp)):
+            nodes[bmu[1]][4][i][1] += 1
+    
+        
+def AddError(bmu):
+    global nodes
+    nodes[bmu[1]][3]=(nodes[bmu[1]][2]*nodes[bmu[1]][2])+nodes[bmu[1]][3]
+    
+def MoveNeighbors(bmu,InputSignal):
+    global En
+    global nodes
+    temp = nodes[bmu[1]][4]
+    for i in range(0,len(temp)):
+        nodes[temp[i][0]][0][0] = nodes[temp[i][0]][0][0]+ En*(InputSignal[0]-nodes[temp[i][0]][0][0])
+        nodes[temp[i][0]][0][1] = nodes[temp[i][0]][0][1]+ En*(InputSignal[1]-nodes[temp[i][0]][0][1])
+        print "moved Neigh",nodes[temp[i][0]][0]
+    
+def SetAge(bmu,sbmu):
+    global nodes
+    temp = nodes[bmu[1]][4]
+    t = nodes[sbmu[1]][4]
+    flag=1
+    for i in range(0,len(temp)):
+        if temp[i][0]==sbmu[1]:
+            nodes[bmu[1]][4][i][1]=0
+            for j in range(0,len(t)):
+                if t[j][0]==bmu[1]:
+                    nodes[sbmu[1]][4][j][1]=0
+                    flag = 0
+                    break
+            break
+        else:
+            flag = 1
+    if flag == 1:
+        nodes[bmu[1]][4].append([sbmu[1],0])
+        nodes[sbmu[1]][4].append([bmu[1],0])
+            
+def RemoveEdges():
+    global nodes
+    global amax
+    for i in range(0,len(nodes)):
+        temp = nodes[i][4]
+        for j in range(0,len(temp)):
+            if nodes[i][4][j][1]>amax:
+                temp2=nodes[i][4][j][0]
+                del nodes[i][4][j]
+                for k in range(0,len(nodes[temp2][4])):
+                    if nodes[temp2][4][k][0]==i:
+                        del nodes[temp2][4][k]
+                            
+def RemoveNode():
+    global nodes
+    for i in range(0,len(nodes)):
+           if not nodes[i][4]:
+               del nodes[i]
+                    
+def InsertNode(InputSignal):
+    global NodeId
+    global nodes
+    global alpha
+    global d
+    Position=[]
+    maxErrorNode=sorted(nodes, key=lambda tup: tup[3])[len(nodes)-1]
+    wq=maxErrorNode[0]
+    error=0
+    for i in range(0,len(maxErrorNode[4])):
+        if nodes[maxErrorNode[4][i][0]][3]>=error:
+            error=nodes[maxErrorNode[4][i][0]][3]
+            maxErrorNeighbor=nodes[maxErrorNode[4][i][0]]
+    wf=maxErrorNeighbor[0]
+    print "Emax",maxErrorNode
+    print "Eneigh",maxErrorNeighbor
+    Position.append(0.5*(wq[0]+wf[0]))
+    Position.append(0.5*(wq[1]+wf[1]))
+    print "position",Position
+    nodes.append([Position,NodeId,distance.euclidean(Position, InputSignal),nodes[maxErrorNode[1]][3],[[maxErrorNode[1],0],[maxErrorNeighbor[1],0]]])
+    print "inserted node",nodes[NodeId]
+    nodes[maxErrorNode[1]][4].append([NodeId,0])
+    nodes[maxErrorNeighbor[1]][4].append([NodeId,0])
+    
+    for i in range(0,len(maxErrorNode[4])):
+        if nodes[maxErrorNode[1]][4][i][0]==maxErrorNeighbor[1]:
+            del nodes[maxErrorNode[1]][4][i]
+            break
+    for i in range(0,len(maxErrorNeighbor[4])):
+        if nodes[maxErrorNeighbor[1]][4][i][0]==maxErrorNode[1]:
+            del nodes[maxErrorNeighbor[1]][4][i]
+            break
+    
+    nodes[maxErrorNode[1]][3]=alpha*nodes[maxErrorNode[1]][3]
+    nodes[maxErrorNeighbor[1]][3]=alpha*nodes[maxErrorNeighbor[1]][3]
+#    nodes[NodeId][3]=nodes[maxErrorNode[1]][3]
+    NodeId=NodeId+1
+        
+    for i in range(0,len(nodes)):
+        nodes[i][3]=nodes[i][3]*d
+
+            
+def main(InputSignal):
+    
+    global bmu 
+    global sbmu
+    global nodes
+    global Eb
+    global En
+    global InputCount
+    
+    if InputCount==0:
+        InitializeNode(InputSignal)
+    print "input",InputSignal
+    GetBMU()
+    GetSBMU()
+    MoveBMU(bmu,InputSignal)
+    IncrementAge(bmu)
+    AddError(bmu)
+    MoveNeighbors(bmu,InputSignal)
+    SetAge(bmu,sbmu)
+    RemoveEdges()
+    RemoveNode()
+    if InputCount % 2== 0:
+        InsertNode(InputSignal)      
+              
+
+GenerateInput(1)
+
+for i in range(0,len(InputSignal)):
+    main(InputSignal[i])
+    InputCount+=1
+
+                        
+                        
+                        
+                        
+                        
